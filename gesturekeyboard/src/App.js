@@ -6,16 +6,17 @@ import { withStyles } from '@material-ui/core/styles';
 import LeapMotion from 'leapjs';
 import TraceSVG from './Components/TraceSVG';
 import firebase from 'firebase';
-import FileUploader from 'react-firebase-file-uploader';
+import axios from 'axios';
+import request from 'request';
 
 // const fingers = ["#9bcfed", "#B2EBF2", "#80DEEA", "#4DD0E1", "#26C6DA"];
 const fingers = ["#9bcfed", "#FFF", "#80DEEA", "#4DD0E1", "#26C6DA"];
 
 const styles = {
   body: {
-    position: 'absolute',
-    height: '100%',
-    width: '100%',
+    width: '100vw',
+    height: '100vh',
+    display: 'flex',
   },
 
   canvas: {
@@ -30,6 +31,26 @@ const styles = {
     height: '100%',
     width: '100%',
     zIndex: 10,
+  },
+
+  classification: {
+    margin: '2%',
+    height: '10%',
+    width: '100%',
+    zIndex: 100,
+    display: 'flex',
+    flexDirection: 'row'
+  },
+
+  label: {
+    fontSize: '30px',
+    fontWeight: 'bold',
+    padding: '10px'
+  },
+  
+  content: {
+    fontSize: '30px',
+    padding: '10px'
   }
 
 };
@@ -46,31 +67,60 @@ class App extends React.Component {
   constructor(props) {
     super(props)
     this.state = {
-      frame: {},
       indexFinger: "",
       trace: new Immutable.List(),
       tracing: false,
-      name: 0,
+      name: 1,
       img: "",
-      isUploading: false,
-      progress: 0,
-      url: ""
+      classified: "",
+      queue: ""
     }
   }
 
   componentDidMount() {
-    document.addEventListener("keydown", this.handleKeydown);
+    document.addEventListener("keydown", (ev) => this.handleKeydown(ev));
     this.leap = LeapMotion.loop((frame) => {
       this.setState({
         frame,
       });
       this.traceFingers(frame);
     });
+
+    this.timer = setInterval(() => {
+      // fetch from firebase
+      (async () => {
+        try {
+          console.log("QUEUE", typeof this.state.queue, this.state.queue != "");
+          if (this.state.queue) {
+            console.log("AHERJQ:WTHRQEJOWKPR#");
+            const key = this.state.queue;
+            console.log("ASFWERQW", key);
+            const apiResponse = await axios.get('https://gesturekeyboard.firebaseio.com/Data.json');
+            const keyData = apiResponse.data[key];
+            if (keyData&& keyData.classification){
+              const classLabel = keyData.classification.toUpperCase();
+              console.log("Label", classLabel);
+              this.updateClassified(classLabel);
+            }
+          }
+        } catch (error) {
+          console.log(error);
+        } 
+      })();
+    }, 100);
   }
 
   componentWillUnmount() {
-    document.removeEventListener("keydown", this.handleKeydown);
+    document.removeEventListener("keydown", (ev) => this.handleKeydown(ev));
+    clearInterval(this.timer);
     this.leap.disconnect();
+  }
+
+  updateClassified = (label) => {
+    this.setState(prevState => ({
+      classified: prevState.classified + label,
+      queue: ""
+    }))
   }
 
   traceFingers(frame) {
@@ -129,7 +179,6 @@ class App extends React.Component {
   }
 
   traceStroke(toTrace) {
-    // console.log("TRACE", toTrace)
     const canvas = this.refs.canvas;
     const ctx = canvas.getContext("2d");
 
@@ -139,7 +188,6 @@ class App extends React.Component {
     const cp2y = toTrace[Math.floor(2 * toTrace.length / 3)].y;
     const x = toTrace[toTrace.length - 1].x;
     const y = toTrace[toTrace.length - 1].y;
-    console.log("TRACE", toTrace)
 
     ctx.beginPath();
     ctx.moveTo(toTrace[0].center[0], toTrace[0].center[1]);
@@ -151,51 +199,72 @@ class App extends React.Component {
     ctx.stroke();
   }
 
-  handleKeydown = () => {
+  handleKeydown = (ev) => {
+    if (ev.code === "Space") {
+      this.handleSwitch();
+    }
+  }
+
+  handleSwitch = () => {
     if (this.state.tracing) {
       console.log("STOP TRACKING");
 
-      // export svg to blob
+      // export the current trace as image
       const svg = document.getElementById("svg");
       const svgData = (new XMLSerializer()).serializeToString(svg);
       var svgSize = svg.getBoundingClientRect();
-      const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
-      const url = URL.createObjectURL(svgBlob);
 
-      // initialize canvas
       var canvas = document.createElement("canvas");
       canvas.width = svgSize.width;
       canvas.height = svgSize.height;
       var ctx = canvas.getContext("2d");
 
-      // set image info
-      const imgname = this.state.name + ".png";
-      var img = new Image;
+      var img = document.createElement("img");
+      const key = this.state.name;
+      const imgname = key + ".png";
       img.name = imgname;
-      img.src = url;
       img.setAttribute("src", "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData))));
 
       img.onload = function () {
         ctx.drawImage(img, 0, 0);
         const imgsrc = canvas.toDataURL("image/png");
         const a = document.createElement("a");
-        a.download = imgname;
+        a.download = "trace.png";
         a.href = imgsrc;
         a.click();
-      };
+        try {
+          // this.updateDatabase(imgname, imgDataUrl);
+          // this.handleUpload(svgBlob, imgname, pngBase64);
+          const options = {
+            method: 'PUT',
+            url: 'https://gesturekeyboard.firebaseio.com/Data/' + key + '.json',
+            headers:
+            {
+              'Cache-Control': 'no-cache',
+              'Content-Type': 'application/json'
+            },
+            body: { imgname, imgsrc },
+            json: true
+          };
 
-      try {
-        this.handleUpload(svgBlob, imgname);
-      } catch (e) {
-        console.log("Upload error", e)
-      }
+          request(options, function (error, response, body) {
+            if (error) throw new Error(error);
+            // console.log(body);
+          });
+
+        } catch (e) {
+          console.log(e);
+        }
+      };
 
       // reset state
       this.setState(prevState => ({
         // trace: new Immutable.List(),
         tracing: false,
+        queue: key,
         name: prevState.name + 1
       }))
+
     } else {
       console.log("START TRACKING");
       this.setState(prevState => ({
@@ -203,56 +272,7 @@ class App extends React.Component {
         tracing: true
       }))
     }
-
-  }
-
-  handleUpload = (blob, imgname) => {
-    const storageFolderRef = firebase.storage().ref().child("tracedImages");
-    const fileName = imgname;
-    const fileRef = storageFolderRef.child(fileName);
-    // const path = fileRef.fullPath;
-    // const name = fileRef.name;
-    // storageFolderRef = fileRef.parent;
-
-    fileRef.put(blob).then(
-      (snapshot) => {
-        // progrss 
-        const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-        this.setState({ progress });
-        console.log("Progress", progress);
-      }
-      // (error) => {
-      //   // error 
-      //   console.log(error);
-      // },
-      // () => {
-      //   console.log("Complete");
-      //   firebase.storage.ref().child("tracedImages").child("fireRef").getDownloadURL().then(url => {
-      //     console.log(url);
-      //     this.setState({ url });
-      //   })
-      // }
-    )
-  }
-
-  // handleUploadStart = () => this.setState({ isUploading: true, progress: 0 });
-
-  // handleProgress = progress => this.setState({ progress });
-
-  // handleUploadError = error => {
-  //   this.setState({ isUploading: false });
-  //   console.error(error);
-  // };
-
-  // handleUploadSuccess = filename => {
-  //   this.setState({ progress: 100, isUploading: false });
-  //   firebase
-  //     .storage()
-  //     .ref("tracedImages")
-  //     .child(filename)
-  //     .getDownloadURL()
-  //     .then(url => this.setState({ url }));
-  // };
+  };
 
   render() {
     const { classes } = this.props;
@@ -260,15 +280,10 @@ class App extends React.Component {
       <div className={classes.body}>
         <canvas ref="canvas" className={classes.canvas} ></canvas>
         <TraceSVG className={classes.traceSVG} trace={this.state.trace} />
-        {/* <FileUploader
-          storageRef={firebase.storage().ref("tracedImages")}
-          filename={this.state.name + ".png"}
-          onUploadStart={this.handleUploadStart}
-          onProgress={this.handleProgress}
-          onUploadError={this.handleUploadError}
-          onUploadSuccess={this.handleUploadSuccess}
-          onProgress={this.handleProgress}
-        /> */}
+        <div className={classes.classification} >
+          <div className={classes.label}>Classified: </div>
+          <div className={classes.content}>{this.state.classified}</div>
+        </div>
       </div>
     )
   }

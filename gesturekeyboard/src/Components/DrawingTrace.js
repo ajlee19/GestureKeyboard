@@ -5,27 +5,27 @@ import { withStyles } from '@material-ui/core/styles';
 
 
 const styles = {
-    path: {
+  path: {
 
-    }
+  }
 };
 
-function DrawingTrace( props ) {
-    const { classes, key, points } = props;
-    const pathData = "M " +
-      points
-        .map(p => {
+function DrawingTrace(props) {
+  const { classes, key, points } = props;
+  const pathData = "M " +
+    points
+      .map(p => {
+        if (p) {
           return `${p.get('x')} ${p.get('y')}`;
-        })
-        .join("\nL ");
-    
-    // console.log("PATH", pathData);
-  
-    return <path className={classes.path} d={pathData} />;
-  }
+        }
+      })
+      .join("\nL ");
+
+  return <path className={classes.path} d={pathData} />;
+}
 
 DrawingTrace.propTypes = {
-    // update
+  // update
 };
 
 export default withStyles(styles)(DrawingTrace);
