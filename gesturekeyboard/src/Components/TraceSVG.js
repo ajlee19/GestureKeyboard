@@ -9,6 +9,7 @@ const styles = {
         position: 'absolute',
         height: '100%',
         width: '100%',
+        backgroundColor: 'black'
     },
 
     DrawingTrace: {
@@ -22,15 +23,17 @@ function TraceSVG(props) {
     const { classes, trace } = props;
     return (
         <svg
+            id = "svg"
             className={classes.svg}
             fill={'none'}
-            strokeWidth={'10px'}
-            stroke={"#B2EBF2"}
+            strokeWidth={'30px'}
+            stroke={"#FFF"}
             strokeLinejoin={'round'}
             strokeLinecap={'round'}
         >
-            {trace.map((point, index) => (
-                <DrawingTrace className={classes.DrawingTrace} key={index} point={point} />
+            {trace.map((points, index) => ( 
+                (index === trace.size -1) ? <DrawingTrace className={classes.DrawingTrace} key={index} points={points} />
+                : <div></div>
             ))}
         </svg>
     );

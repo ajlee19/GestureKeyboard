@@ -6,21 +6,14 @@ import { withStyles } from '@material-ui/core/styles';
 
 const styles = {
     path: {
-        // position: 'absolute',
-        // height: '100%',
-        // width: '100%',
-        // // fill: none,
-        // // strokeWidth: '10px',
-        // // stroke: 'black',
-        // // strokeLineJoin: 'round',
-        // // strokeLinecap: 'round'
+
     }
 };
 
 function DrawingTrace( props ) {
-    const { classes, key, point } = props;
+    const { classes, key, points } = props;
     const pathData = "M " +
-      point
+      points
         .map(p => {
           return `${p.get('x')} ${p.get('y')}`;
         })

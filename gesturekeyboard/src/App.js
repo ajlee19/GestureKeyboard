@@ -5,8 +5,10 @@ import Immutable from 'immutable';
 import { withStyles } from '@material-ui/core/styles';
 import LeapMotion from 'leapjs';
 import TraceSVG from './Components/TraceSVG';
+// import 'save-svg-as-png';
 
-const fingers = ["#9bcfed", "#B2EBF2", "#80DEEA", "#4DD0E1", "#26C6DA"];
+// const fingers = ["#9bcfed", "#B2EBF2", "#80DEEA", "#4DD0E1", "#26C6DA"];
+const fingers = ["#9bcfed", "#FFF", "#80DEEA", "#4DD0E1", "#26C6DA"];
 
 const styles = {
   body: {
@@ -26,7 +28,8 @@ const styles = {
     position: 'absolute',
     height: '100%',
     width: '100%',
-    zIndex: 10  
+    zIndex: 10,
+    background: 'black'
   }
 
 };
@@ -73,8 +76,8 @@ class App extends React.Component {
           const normalized = frame.interactionBox.normalizePoint(position);
           const x = ctx.canvas.width * normalized[0];
           const y = ctx.canvas.height * (1 - normalized[1]);
-          const radius = Math.min(20 / Math.abs(pointable.touchDistance), 50);          
-          const point = new Immutable.Map({ x, y})
+          const radius = Math.min(20 / Math.abs(pointable.touchDistance), 50);
+          const point = new Immutable.Map({ x, y })
 
           if (this.state.tracing) {
             this.setState(prevState => ({
@@ -139,13 +142,34 @@ class App extends React.Component {
     if (this.state.tracing) {
       console.log("STOP TRACKING");
       // export the current trace as image
+      const svg = document.getElementById("svg");
+      const svgData = (new XMLSerializer()).serializeToString(svg);
+      var svgSize = svg.getBoundingClientRect();
+
+      var canvas = document.createElement("canvas");
+      canvas.width = svgSize.width;
+      canvas.height = svgSize.height;
+      var ctx = canvas.getContext("2d");
+
+      var img = document.createElement("img");
+      img.style.backgroundColor = "black";
+      img.setAttribute("src", "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData))));
+
+      img.onload = function () {
+        ctx.drawImage(img, 0, 0);
+        const imgsrc = canvas.toDataURL("image/png");
+        const a = document.createElement("a");
+        a.download = "trace.png";
+        a.href = imgsrc;
+        a.click();
+      };
+      console.log(svg);
+
+      // reset state
       this.setState(prevState => ({
-        trace: new Immutable.List(),
-        tracing: true
-      }))
-      this.setState({
+        // trace: new Immutable.List(),
         tracing: false
-      })
+      }))
     } else {
       console.log("START TRACKING");
       this.setState(prevState => ({
@@ -160,8 +184,8 @@ class App extends React.Component {
     const { classes } = this.props;
     return (
       <div className={classes.body}>
-        <canvas className={classes.canvas} ref="canvas"></canvas>
-        <TraceSVG className={classes.traceSVG} trace={this.state.trace} /> 
+        <canvas ref="canvas" className={classes.canvas} ></canvas>
+        <TraceSVG className={classes.traceSVG} trace={this.state.trace} />
       </div>
     )
   }
@@ -186,7 +210,7 @@ class App extends React.Component {
 //         return `${p.get('x')} ${p.get('y')}`;
 //       })
 //       .join("\nL ");
-  
+
 //   console.log("PATH", pathData);
 
 //   return <path className={classes.path} d={pathData} />;
