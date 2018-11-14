@@ -1,15 +1,16 @@
 # Gesture Keyboard
 
 ## Collected Dataset
-###The EMNIST Dataset https://www.kaggle.com/crawford/emnist)
+
+### The EMNIST Dataset https://www.kaggle.com/crawford/emnist)
  
-####What is it?
+#### What is it?
 The EMNIST dataset is a set of handwritten character digits derived from the NIST Special Database 19  and converted to a 28x28 pixel image format and dataset structure that directly matches the MNIST dataset . Further information on the dataset contents and conversion process can be found in the paper available at https://arxiv.org/abs/1702.05373v1.
 
-####Formats
+#### Formats
 The dataset is provided in two file formats. Both versions of the dataset contain identical information, and are provided entirely for the sake of convenience. The first dataset is provided in a Matlab format that is accessible through both Matlab and Python (using the scipy.io.loadmat function). The second version of the dataset is provided in the same binary format as the original MNIST dataset as outlined in http://yann.lecun.com/exdb/mnist/
 
-####Dataset Summary
+#### Dataset Summary
 There are six different splits provided in this dataset. A short summary of the dataset is provided below:
 
 * EMNIST ByClass: 814,255 characters. 62 unbalanced classes.
@@ -23,5 +24,5 @@ The full complement of the NIST Special Database 19 is available in the ByClass 
 
 (above information from https://www.nist.gov/itl/iad/image-group/emnist-dataset)
 
-###How we used EMNIST
+### How we used EMNIST
 We used the EMNIST Letters dataset for our project. To create the model, we used the testing and training datas from this dataset. 
