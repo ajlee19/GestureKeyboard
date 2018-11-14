@@ -43,12 +43,14 @@ const styles = {
   },
 
   label: {
+    color: '#FFF',
     fontSize: '30px',
     fontWeight: 'bold',
     padding: '10px'
   },
   
   content: {
+    color: '#FFF',
     fontSize: '30px',
     padding: '10px'
   }
@@ -226,15 +228,16 @@ class App extends React.Component {
       img.setAttribute("src", "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData))));
 
       img.onload = function () {
+        // draw image
         ctx.drawImage(img, 0, 0);
         const imgsrc = canvas.toDataURL("image/png");
         const a = document.createElement("a");
         a.download = "trace.png";
         a.href = imgsrc;
         a.click();
+
+        // update database
         try {
-          // this.updateDatabase(imgname, imgDataUrl);
-          // this.handleUpload(svgBlob, imgname, pngBase64);
           const options = {
             method: 'PUT',
             url: 'https://gesturekeyboard.firebaseio.com/Data/' + key + '.json',
