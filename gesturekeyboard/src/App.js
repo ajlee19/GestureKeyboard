@@ -5,7 +5,8 @@ import Immutable from 'immutable';
 import { withStyles } from '@material-ui/core/styles';
 import LeapMotion from 'leapjs';
 import TraceSVG from './Components/TraceSVG';
-// import 'save-svg-as-png';
+import firebase from 'firebase';
+import FileUploader from 'react-firebase-file-uploader';
 
 // const fingers = ["#9bcfed", "#B2EBF2", "#80DEEA", "#4DD0E1", "#26C6DA"];
 const fingers = ["#9bcfed", "#FFF", "#80DEEA", "#4DD0E1", "#26C6DA"];
@@ -29,10 +30,17 @@ const styles = {
     height: '100%',
     width: '100%',
     zIndex: 10,
-    background: 'black'
   }
 
 };
+
+const config = {
+  apiKey: "AIzaSyDuiOnplJjjoh9poil-h67uFPUBw7ojJ0c",
+  authDomain: "gesturekeyboard.firebaseapp.com",
+  databaseURL: "https://gesturekeyboard.firebaseio.com",
+  storageBucket: "gs://gesturekeyboard.appspot.com",
+};
+firebase.initializeApp(config);
 
 class App extends React.Component {
   constructor(props) {
@@ -41,7 +49,12 @@ class App extends React.Component {
       frame: {},
       indexFinger: "",
       trace: new Immutable.List(),
-      tracing: false
+      tracing: false,
+      name: 0,
+      img: "",
+      isUploading: false,
+      progress: 0,
+      url: ""
     }
   }
 
@@ -141,34 +154,47 @@ class App extends React.Component {
   handleKeydown = () => {
     if (this.state.tracing) {
       console.log("STOP TRACKING");
-      // export the current trace as image
+
+      // export svg to blob
       const svg = document.getElementById("svg");
       const svgData = (new XMLSerializer()).serializeToString(svg);
       var svgSize = svg.getBoundingClientRect();
+      const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(svgBlob);
 
+      // initialize canvas
       var canvas = document.createElement("canvas");
       canvas.width = svgSize.width;
       canvas.height = svgSize.height;
       var ctx = canvas.getContext("2d");
 
-      var img = document.createElement("img");
-      img.style.backgroundColor = "black";
+      // set image info
+      const imgname = this.state.name + ".png";
+      var img = new Image;
+      img.name = imgname;
+      img.src = url;
       img.setAttribute("src", "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData))));
 
       img.onload = function () {
         ctx.drawImage(img, 0, 0);
         const imgsrc = canvas.toDataURL("image/png");
         const a = document.createElement("a");
-        a.download = "trace.png";
+        a.download = imgname;
         a.href = imgsrc;
         a.click();
       };
-      console.log(svg);
+
+      try {
+        this.handleUpload(svgBlob, imgname);
+      } catch (e) {
+        console.log("Upload error", e)
+      }
 
       // reset state
       this.setState(prevState => ({
         // trace: new Immutable.List(),
-        tracing: false
+        tracing: false,
+        name: prevState.name + 1
       }))
     } else {
       console.log("START TRACKING");
@@ -180,41 +206,73 @@ class App extends React.Component {
 
   }
 
+  handleUpload = (blob, imgname) => {
+    const storageFolderRef = firebase.storage().ref().child("tracedImages");
+    const fileName = imgname;
+    const fileRef = storageFolderRef.child(fileName);
+    // const path = fileRef.fullPath;
+    // const name = fileRef.name;
+    // storageFolderRef = fileRef.parent;
+
+    fileRef.put(blob).then(
+      (snapshot) => {
+        // progrss 
+        const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+        this.setState({ progress });
+        console.log("Progress", progress);
+      }
+      // (error) => {
+      //   // error 
+      //   console.log(error);
+      // },
+      // () => {
+      //   console.log("Complete");
+      //   firebase.storage.ref().child("tracedImages").child("fireRef").getDownloadURL().then(url => {
+      //     console.log(url);
+      //     this.setState({ url });
+      //   })
+      // }
+    )
+  }
+
+  // handleUploadStart = () => this.setState({ isUploading: true, progress: 0 });
+
+  // handleProgress = progress => this.setState({ progress });
+
+  // handleUploadError = error => {
+  //   this.setState({ isUploading: false });
+  //   console.error(error);
+  // };
+
+  // handleUploadSuccess = filename => {
+  //   this.setState({ progress: 100, isUploading: false });
+  //   firebase
+  //     .storage()
+  //     .ref("tracedImages")
+  //     .child(filename)
+  //     .getDownloadURL()
+  //     .then(url => this.setState({ url }));
+  // };
+
   render() {
     const { classes } = this.props;
     return (
       <div className={classes.body}>
         <canvas ref="canvas" className={classes.canvas} ></canvas>
         <TraceSVG className={classes.traceSVG} trace={this.state.trace} />
+        {/* <FileUploader
+          storageRef={firebase.storage().ref("tracedImages")}
+          filename={this.state.name + ".png"}
+          onUploadStart={this.handleUploadStart}
+          onProgress={this.handleProgress}
+          onUploadError={this.handleUploadError}
+          onUploadSuccess={this.handleUploadSuccess}
+          onProgress={this.handleProgress}
+        /> */}
       </div>
     )
   }
 }
-
-// function TraceSVG({classes, trace}) {
-//   // const { classes, trace } = this.props;
-//   return (
-//     <svg className={classes.svg}>
-//       {trace.map((point, index) => (
-//         <DrawingTrace className={classes.drawingTrace} key={index} point={point} />
-//       ))}
-//     </svg>
-//   );
-// }
-
-// function DrawingTrace({ classes, key, point }) {
-//   // const { classes } = this.props;
-//   const pathData = "M " +
-//     point
-//       .map(p => {
-//         return `${p.get('x')} ${p.get('y')}`;
-//       })
-//       .join("\nL ");
-
-//   console.log("PATH", pathData);
-
-//   return <path className={classes.path} d={pathData} />;
-// }
 
 App.propTypes = {
 

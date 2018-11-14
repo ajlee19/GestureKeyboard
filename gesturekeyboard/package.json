@@ -4,10 +4,12 @@
   "private": true,
   "dependencies": {
     "@material-ui/core": "^1.4.0",
+    "firebase": "^5.5.8",
     "immutable": "^4.0.0-rc.12",
     "leapjs": "^0.6.4",
     "react": "^16.6.3",
     "react-dom": "^16.6.3",
+    "react-firebase-file-uploader": "^2.4.2",
     "react-scripts": "2.1.1",
     "save-svg-as-png": "^1.4.6"
   },
