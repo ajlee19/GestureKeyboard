@@ -5,16 +5,18 @@ import Immutable from 'immutable';
 import { withStyles } from '@material-ui/core/styles';
 import LeapMotion from 'leapjs';
 import TraceSVG from './Components/TraceSVG';
-// import 'save-svg-as-png';
+import firebase from 'firebase';
+import axios from 'axios';
+import request from 'request';
 
 // const fingers = ["#9bcfed", "#B2EBF2", "#80DEEA", "#4DD0E1", "#26C6DA"];
 const fingers = ["#9bcfed", "#FFF", "#80DEEA", "#4DD0E1", "#26C6DA"];
 
 const styles = {
   body: {
-    position: 'absolute',
-    height: '100%',
-    width: '100%',
+    width: '100vw',
+    height: '100vh',
+    display: 'flex',
   },
 
   canvas: {
@@ -29,35 +31,96 @@ const styles = {
     height: '100%',
     width: '100%',
     zIndex: 10,
-    background: 'black'
+  },
+
+  classification: {
+    margin: '2%',
+    height: '10%',
+    width: '100%',
+    zIndex: 100,
+    display: 'flex',
+    flexDirection: 'row'
+  },
+
+  label: {
+    fontSize: '30px',
+    fontWeight: 'bold',
+    padding: '10px'
+  },
+  
+  content: {
+    fontSize: '30px',
+    padding: '10px'
   }
 
 };
+
+const config = {
+  apiKey: "AIzaSyDuiOnplJjjoh9poil-h67uFPUBw7ojJ0c",
+  authDomain: "gesturekeyboard.firebaseapp.com",
+  databaseURL: "https://gesturekeyboard.firebaseio.com",
+  storageBucket: "gs://gesturekeyboard.appspot.com",
+};
+firebase.initializeApp(config);
 
 class App extends React.Component {
   constructor(props) {
     super(props)
     this.state = {
-      frame: {},
       indexFinger: "",
       trace: new Immutable.List(),
-      tracing: false
+      tracing: false,
+      name: 1,
+      img: "",
+      classified: "",
+      queue: ""
     }
   }
 
   componentDidMount() {
-    document.addEventListener("keydown", this.handleKeydown);
+    document.addEventListener("keydown", (ev) => this.handleKeydown(ev));
     this.leap = LeapMotion.loop((frame) => {
       this.setState({
         frame,
       });
       this.traceFingers(frame);
     });
+
+    this.timer = setInterval(() => {
+      // fetch from firebase
+      (async () => {
+        try {
+          console.log("QUEUE", typeof this.state.queue, this.state.queue != "");
+          if (this.state.queue) {
+            console.log("AHERJQ:WTHRQEJOWKPR#");
+            const key = this.state.queue;
+            console.log("ASFWERQW", key);
+            const apiResponse = await axios.get('https://gesturekeyboard.firebaseio.com/Data.json');
+            const keyData = apiResponse.data[key];
+            if (keyData&& keyData.classification){
+              const classLabel = keyData.classification.toUpperCase();
+              console.log("Label", classLabel);
+              this.updateClassified(classLabel);
+            }
+          }
+        } catch (error) {
+          console.log(error);
+        } 
+      })();
+    }, 100);
   }
 
   componentWillUnmount() {
-    document.removeEventListener("keydown", this.handleKeydown);
+    document.removeEventListener("keydown", (ev) => this.handleKeydown(ev));
+    clearInterval(this.timer);
     this.leap.disconnect();
+  }
+
+  updateClassified = (label) => {
+    this.setState(prevState => ({
+      classified: prevState.classified + label,
+      queue: ""
+    }))
   }
 
   traceFingers(frame) {
@@ -116,7 +179,6 @@ class App extends React.Component {
   }
 
   traceStroke(toTrace) {
-    // console.log("TRACE", toTrace)
     const canvas = this.refs.canvas;
     const ctx = canvas.getContext("2d");
 
@@ -126,7 +188,6 @@ class App extends React.Component {
     const cp2y = toTrace[Math.floor(2 * toTrace.length / 3)].y;
     const x = toTrace[toTrace.length - 1].x;
     const y = toTrace[toTrace.length - 1].y;
-    console.log("TRACE", toTrace)
 
     ctx.beginPath();
     ctx.moveTo(toTrace[0].center[0], toTrace[0].center[1]);
@@ -138,9 +199,16 @@ class App extends React.Component {
     ctx.stroke();
   }
 
-  handleKeydown = () => {
+  handleKeydown = (ev) => {
+    if (ev.code === "Space") {
+      this.handleSwitch();
+    }
+  }
+
+  handleSwitch = () => {
     if (this.state.tracing) {
       console.log("STOP TRACKING");
+
       // export the current trace as image
       const svg = document.getElementById("svg");
       const svgData = (new XMLSerializer()).serializeToString(svg);
@@ -152,7 +220,9 @@ class App extends React.Component {
       var ctx = canvas.getContext("2d");
 
       var img = document.createElement("img");
-      img.style.backgroundColor = "black";
+      const key = this.state.name;
+      const imgname = key + ".png";
+      img.name = imgname;
       img.setAttribute("src", "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData))));
 
       img.onload = function () {
@@ -162,14 +232,39 @@ class App extends React.Component {
         a.download = "trace.png";
         a.href = imgsrc;
         a.click();
+        try {
+          // this.updateDatabase(imgname, imgDataUrl);
+          // this.handleUpload(svgBlob, imgname, pngBase64);
+          const options = {
+            method: 'PUT',
+            url: 'https://gesturekeyboard.firebaseio.com/Data/' + key + '.json',
+            headers:
+            {
+              'Cache-Control': 'no-cache',
+              'Content-Type': 'application/json'
+            },
+            body: { imgname, imgsrc },
+            json: true
+          };
+
+          request(options, function (error, response, body) {
+            if (error) throw new Error(error);
+            // console.log(body);
+          });
+
+        } catch (e) {
+          console.log(e);
+        }
       };
-      console.log(svg);
 
       // reset state
       this.setState(prevState => ({
         // trace: new Immutable.List(),
-        tracing: false
+        tracing: false,
+        queue: key,
+        name: prevState.name + 1
       }))
+
     } else {
       console.log("START TRACKING");
       this.setState(prevState => ({
@@ -177,8 +272,7 @@ class App extends React.Component {
         tracing: true
       }))
     }
-
-  }
+  };
 
   render() {
     const { classes } = this.props;
@@ -186,35 +280,14 @@ class App extends React.Component {
       <div className={classes.body}>
         <canvas ref="canvas" className={classes.canvas} ></canvas>
         <TraceSVG className={classes.traceSVG} trace={this.state.trace} />
+        <div className={classes.classification} >
+          <div className={classes.label}>Classified: </div>
+          <div className={classes.content}>{this.state.classified}</div>
+        </div>
       </div>
     )
   }
 }
-
-// function TraceSVG({classes, trace}) {
-//   // const { classes, trace } = this.props;
-//   return (
-//     <svg className={classes.svg}>
-//       {trace.map((point, index) => (
-//         <DrawingTrace className={classes.drawingTrace} key={index} point={point} />
-//       ))}
-//     </svg>
-//   );
-// }
-
-// function DrawingTrace({ classes, key, point }) {
-//   // const { classes } = this.props;
-//   const pathData = "M " +
-//     point
-//       .map(p => {
-//         return `${p.get('x')} ${p.get('y')}`;
-//       })
-//       .join("\nL ");
-
-//   console.log("PATH", pathData);
-
-//   return <path className={classes.path} d={pathData} />;
-// }
 
 App.propTypes = {
 
